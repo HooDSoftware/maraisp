@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ISP Admin Dashboard</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0f1117;--surface:#1a1d2e;--card:#22263a;
+    --accent:#3b82f6;--green:#22c55e;--red:#ef4444;
+    --yellow:#f59e0b;--text:#e2e8f0;--muted:#64748b;
+    --border:#2d3148;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px}
+  a{color:var(--accent);text-decoration:none}
+
+  /* Layout */
+  .app{display:flex;height:100vh;overflow:hidden}
+  .sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;flex-shrink:0}
+  .main{flex:1;overflow-y:auto;padding:24px}
+
+  /* Sidebar */
+  .logo{padding:20px 16px;font-size:16px;font-weight:700;color:#fff;
+    border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+  .logo span{font-size:22px}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;
+    cursor:pointer;border-radius:0;transition:background .15s;color:var(--muted)}
+  .nav-item:hover,.nav-item.active{background:var(--card);color:#fff}
+  .nav-item .icon{font-size:18px;width:20px;text-align:center}
+  .nav-badge{margin-left:auto;background:var(--accent);color:#fff;
+    font-size:10px;padding:1px 6px;border-radius:999px}
+
+  /* Cards */
+  .page{display:none}.page.active{display:block}
+  .page-title{font-size:20px;font-weight:700;margin-bottom:20px;color:#fff}
+  .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+  .grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
+  @media(max-width:900px){.grid-4{grid-template-columns:repeat(2,1fr)}.grid-2{grid-template-columns:1fr}}
+  .stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+  .stat-label{color:var(--muted);font-size:12px;margin-bottom:6px}
+  .stat-value{font-size:26px;font-weight:700;color:#fff}
+  .stat-sub{font-size:11px;color:var(--muted);margin-top:4px}
+  .stat-card.green .stat-value{color:var(--green)}
+  .stat-card.blue  .stat-value{color:var(--accent)}
+  .stat-card.yellow.stat-value{color:var(--yellow)}
+  .stat-card.red   .stat-value{color:var(--red)}
+
+  /* Table */
+  .table-wrap{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:auto}
+  table{width:100%;border-collapse:collapse}
+  th{background:var(--surface);color:var(--muted);font-size:11px;
+    text-transform:uppercase;letter-spacing:.05em;padding:10px 14px;text-align:left}
+  td{padding:10px 14px;border-top:1px solid var(--border);color:var(--text)}
+  tr:hover td{background:rgba(255,255,255,.02)}
+
+  /* Badges */
+  .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
+  .badge.green{background:rgba(34,197,94,.15);color:var(--green)}
+  .badge.red{background:rgba(239,68,68,.15);color:var(--red)}
+  .badge.yellow{background:rgba(245,158,11,.15);color:var(--yellow)}
+  .badge.blue{background:rgba(59,130,246,.15);color:var(--accent)}
+  .badge.gray{background:rgba(100,116,139,.15);color:var(--muted)}
+
+  /* Buttons */
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;
+    border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:opacity .15s}
+  .btn:hover{opacity:.85}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-danger{background:var(--red);color:#fff}
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
+  .btn-sm{padding:4px 10px;font-size:12px}
+
+  /* Forms */
+  .form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}
+  .form-group label{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}
+  .form-group input,.form-group select{
+    width:100%;background:var(--surface);border:1px solid var(--border);
+    color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px}
+  .form-group input:focus,.form-group select:focus{outline:none;border-color:var(--accent)}
+  .form-actions{display:flex;gap:10px;align-items:center;margin-top:8px}
+
+  /* Panel */
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:10px;
+    padding:20px;margin-bottom:20px}
+  .panel-title{font-size:14px;font-weight:700;color:#fff;margin-bottom:16px;
+    display:flex;align-items:center;gap:8px}
+
+  /* Toast */
+  #toast{position:fixed;bottom:24px;right:24px;z-index:9999;
+    background:#1e293b;border:1px solid var(--border);color:#fff;
+    padding:12px 18px;border-radius:8px;font-size:13px;
+    opacity:0;transition:opacity .3s;pointer-events:none;max-width:320px}
+  #toast.show{opacity:1}
+  #toast.ok{border-left:3px solid var(--green)}
+  #toast.err{border-left:3px solid var(--red)}
+
+  /* Router health */
+  .health-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+  .health-dot.green{background:var(--green)}
+  .health-dot.red{background:var(--red)}
+
+  /* Loader */
+  .loading{text-align:center;padding:40px;color:var(--muted)}
+  .spin{display:inline-block;width:20px;height:20px;border:2px solid var(--border);
+    border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  
+  /* Voucher grid */
+  .voucher-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:12px}
+  .voucher-chip{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:10px;text-align:center;font-family:monospace;font-size:15px;font-weight:700;
+    letter-spacing:2px;color:#fff}
+  .voucher-chip small{display:block;font-size:10px;color:var(--muted);font-family:sans-serif;
+    letter-spacing:0;font-weight:400;margin-top:4px}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ── Sidebar ────────────────────────────── -->
+<aside class="sidebar">
+  <div class="logo"><span>📡</span> ISP Admin</div>
+  <nav id="nav">
+    <div class="nav-item active" data-page="overview">
+      <span class="icon">📊</span> Overview
+    </div>
+    <div class="nav-item" data-page="pppoe">
+      <span class="icon">🔌</span> PPPoE Users
+    </div>
+    <div class="nav-item" data-page="hotspot">
+      <span class="icon">📶</span> Hotspot
+    </div>
+    <div class="nav-item" data-page="sessions">
+      <span class="icon">👥</span> Sessions
+    </div>
+    <div class="nav-item" data-page="payments">
+      <span class="icon">💳</span> Payments
+    </div>
+    <div class="nav-item" data-page="reports">
+      <span class="icon">📈</span> Reports
+    </div>
+    <div class="nav-item" data-page="router">
+      <span class="icon">🛡️</span> Router
+    </div>
+  </nav>
+  <div style="margin-top:auto;padding:16px;border-top:1px solid var(--border)">
+    <div id="health-indicator" style="font-size:12px;color:var(--muted)">
+      <span class="health-dot" id="hdot"></span>
+      <span id="hstatus">Checking…</span>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-top:4px">762d07842fbf.sn.mynetname.net</div>
+  </div>
+</aside>
+
+<!-- ── Main ───────────────────────────────── -->
+<main class="main">
+
+  <!-- OVERVIEW -->
+  <div class="page active" id="page-overview">
+    <div class="page-title">Overview</div>
+    <div class="grid-4" id="overview-stats">
+      <div class="stat-card green"><div class="stat-label">Revenue Today</div><div class="stat-value" id="rev-today">—</div><div class="stat-sub">KSH</div></div>
+      <div class="stat-card blue"><div class="stat-label">This Month</div><div class="stat-value" id="rev-month">—</div><div class="stat-sub">KSH</div></div>
+      <div class="stat-card"><div class="stat-label">PPPoE Subscribers</div><div class="stat-value" id="pppoe-count">—</div><div class="stat-sub">active</div></div>
+      <div class="stat-card"><div class="stat-label">Hotspot Vouchers</div><div class="stat-value" id="voucher-count">—</div><div class="stat-sub">issued</div></div>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-title">💳 Recent Payments</div>
+        <div id="recent-payments"><div class="loading"><div class="spin"></div></div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">📊 Revenue by Plan</div>
+        <div id="plan-breakdown"><div class="loading"><div class="spin"></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PPPOE -->
+  <div class="page" id="page-pppoe">
+    <div class="page-title">PPPoE Users</div>
+    <div class="panel">
+      <div class="panel-title">➕ Create Subscriber</div>
+      <div class="form-row">
+        <div class="form-group"><label>Username</label><input id="pp-user" placeholder="e.g. john_doe"></div>
+        <div class="form-group"><label>Password</label><input id="pp-pass" placeholder="Auto-generated if blank"></div>
+        <div class="form-group"><label>Plan</label>
+          <select id="pp-plan">
+            <option value="plan-500">plan-500 — 5Mbps 1dev KSH500</option>
+            <option value="plan-700">plan-700 — 5Mbps 2dev KSH700</option>
+            <option value="plan-1000" selected>plan-1000 — 7Mbps 5dev KSH1000</option>
+            <option value="plan-1300">plan-1300 — 10Mbps Unlim KSH1300</option>
+            <option value="plan-grace">plan-grace — Throttled grace</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Phone</label><input id="pp-phone" placeholder="2547XXXXXXXX"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="createPPPoE()">Create Account</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Username</th><th>Profile</th><th>Service</th><th>Active</th><th>Uptime</th><th>Actions</th></tr></thead>
+        <tbody id="pppoe-table"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- HOTSPOT -->
+  <div class="page" id="page-hotspot">
+    <div class="page-title">Hotspot Vouchers</div>
+    <div class="panel">
+      <div class="panel-title">🎟️ Generate Vouchers</div>
+      <div class="form-row">
+        <div class="form-group"><label>Plan</label>
+          <select id="hs-plan">
+            <option value="hs-3min">3 min — KSH 4</option>
+            <option value="hs-2hr">2 hr — KSH 8</option>
+            <option value="hs-4hr">4 hr — KSH 13</option>
+            <option value="hs-6hr">6 hr — KSH 18</option>
+            <option value="hs-daily" selected>Daily — KSH 28</option>
+            <option value="hs-2day">2 Days — KSH 48</option>
+            <option value="hs-weekly">Weekly — KSH 190</option>
+            <option value="hs-monthly">Monthly — KSH 500</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Count</label><input id="hs-count" type="number" value="1" min="1" max="50"></div>
+        <div class="form-group"><label>Phone (optional — sends via WhatsApp)</label><input id="hs-phone" placeholder="2547XXXXXXXX"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="generateVouchers()">Generate</button>
+      </div>
+      <div id="voucher-result" style="display:none;margin-top:16px">
+        <div class="panel-title">Generated Codes</div>
+        <div id="voucher-chips" class="voucher-grid"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">📋 Voucher History</div>
+      <div style="display:flex;gap:10px;margin-bottom:12px">
+        <button class="btn btn-ghost btn-sm" onclick="loadVouchers(null)">All</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadVouchers(false)">Unused</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadVouchers(true)">Used</button>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Code</th><th>Plan</th><th>Phone</th><th>Used</th><th>Created</th></tr></thead>
+        <tbody id="voucher-table"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- SESSIONS -->
+  <div class="page" id="page-sessions">
+    <div class="page-title">Live Sessions</div>
+    <div style="display:flex;gap:10px;margin-bottom:16px">
+      <button class="btn btn-ghost btn-sm" onclick="loadSessions()">🔄 Refresh</button>
+    </div>
+    <div class="panel">
+      <div class="panel-title">🔌 Active PPPoE Sessions (<span id="pppoe-sess-count">0</span>)</div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Username</th><th>IP</th><th>Uptime</th><th>Rate</th><th>Action</th></tr></thead>
+        <tbody id="pppoe-sessions"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody></table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">📶 Active Hotspot Sessions (<span id="hs-sess-count">0</span>)</div>
+      <div class="table-wrap">
+        <table><thead><tr><th>User</th><th>IP</th><th>MAC</th><th>Uptime</th><th>Action</th></tr></thead>
+        <tbody id="hs-sessions"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAYMENTS -->
+  <div class="page" id="page-payments">
+    <div class="page-title">Payments</div>
+    <div class="panel">
+      <div class="panel-title">💸 Initiate STK Push</div>
+      <div class="form-row">
+        <div class="form-group"><label>Phone</label><input id="stk-phone" placeholder="2547XXXXXXXX"></div>
+        <div class="form-group"><label>Plan</label>
+          <select id="stk-plan">
+            <option value="plan-500">PPPoE 500</option><option value="plan-700">PPPoE 700</option>
+            <option value="plan-1000">PPPoE 1000</option><option value="plan-1300">PPPoE 1300</option>
+            <option value="hs-3min">Hotspot 3min</option><option value="hs-2hr">Hotspot 2hr</option>
+            <option value="hs-4hr">Hotspot 4hr</option><option value="hs-6hr">Hotspot 6hr</option>
+            <option value="hs-daily">Hotspot Daily</option><option value="hs-2day">Hotspot 2Day</option>
+            <option value="hs-weekly">Hotspot Weekly</option><option value="hs-monthly">Hotspot Monthly</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Username (PPPoE only)</label><input id="stk-user" placeholder="Leave blank for hotspot"></div>
+      </div>
+      <button class="btn btn-primary" onclick="initiateSTK()">Send STK Push</button>
+    </div>
+    <div class="table-wrap">
+      <table><thead><tr><th>Phone</th><th>Plan</th><th>Amount</th><th>Status</th><th>Receipt</th><th>Account</th><th>Date</th></tr></thead>
+      <tbody id="payments-table"><tr><td colspan="7" class="loading">Loading…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <!-- REPORTS -->
+  <div class="page" id="page-reports">
+    <div class="page-title">Reports</div>
+    <div class="grid-4">
+      <div class="stat-card green"><div class="stat-label">Total Revenue</div><div class="stat-value" id="r-total">—</div><div class="stat-sub">all time KSH</div></div>
+      <div class="stat-card blue"><div class="stat-label">Payments Paid</div><div class="stat-value" id="r-paid">—</div></div>
+      <div class="stat-card yellow"><div class="stat-label">Pending</div><div class="stat-value" id="r-pending">—</div></div>
+      <div class="stat-card red"><div class="stat-label">Failed</div><div class="stat-value" id="r-failed">—</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">📆 Daily Revenue (30 days)</div>
+      <canvas id="revenue-chart" height="80"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-title">🎯 Revenue by Plan</div>
+      <div id="plan-table"><div class="loading"><div class="spin"></div></div></div>
+    </div>
+  </div>
+
+  <!-- ROUTER -->
+  <div class="page" id="page-router">
+    <div class="page-title">Router Health</div>
+    <button class="btn btn-ghost btn-sm" onclick="loadRouter()" style="margin-bottom:16px">🔄 Refresh</button>
+    <div class="grid-4" id="router-stats">
+      <div class="stat-card"><div class="stat-label">CPU Load</div><div class="stat-value" id="rt-cpu">—</div></div>
+      <div class="stat-card"><div class="stat-label">Free Memory</div><div class="stat-value" id="rt-mem">—</div></div>
+      <div class="stat-card"><div class="stat-label">Uptime</div><div class="stat-value" id="rt-uptime" style="font-size:16px">—</div></div>
+      <div class="stat-card"><div class="stat-label">Platform</div><div class="stat-value" id="rt-board" style="font-size:16px">—</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">🌐 Interfaces</div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Interface</th><th>Type</th><th>Running</th><th>TX Bytes</th><th>RX Bytes</th></tr></thead>
+        <tbody id="iface-table"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+</main>
+</div>
+<div id="toast"></div>
+
+<script>
+// ── Helpers ────────────────────────────────────────────────
+const API = '';   // same origin
+const $ = id => document.getElementById(id);
+
+function fmt(n){return Number(n).toLocaleString()}
+function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleString('en-KE',{timeZone:'Africa/Nairobi'})}
+function badge(val, map){
+  const m=map[val]||map['_'];
+  return `<span class="badge ${m[0]}">${m[1]||val}</span>`;
+}
+
+async function api(path, opts={}){
+  const r = await fetch(API+path, opts);
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+let _toastTimer;
+function toast(msg, type='ok'){
+  const t=$('toast');
+  t.textContent=msg; t.className='show '+(type==='ok'?'ok':'err');
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(()=>t.className='',3500);
+}
+
+// ── Navigation ─────────────────────────────────────────────
+document.querySelectorAll('.nav-item').forEach(el=>{
+  el.addEventListener('click',()=>{
+    document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+    el.classList.add('active');
+    const page = el.dataset.page;
+    $('page-'+page).classList.add('active');
+    if(page==='overview')   loadOverview();
+    if(page==='pppoe')      loadPPPoE();
+    if(page==='hotspot')    loadHotspot();
+    if(page==='sessions')   loadSessions();
+    if(page==='payments')   loadPayments();
+    if(page==='reports')    loadReports();
+    if(page==='router')     loadRouter();
+  });
+});
+
+// ── Health check ───────────────────────────────────────────
+async function checkHealth(){
+  try{
+    const d=await api('/health');
+    const ok=d.status==='ok';
+    $('hdot').className='health-dot '+(ok?'green':'red');
+    $('hstatus').textContent=ok?'Router Online':'Degraded';
+  }catch{
+    $('hdot').className='health-dot red';
+    $('hstatus').textContent='Offline';
+  }
+}
+checkHealth();
+setInterval(checkHealth, 30000);
+
+// ── Overview ───────────────────────────────────────────────
+async function loadOverview(){
+  try{
+    const s=await api('/reports/summary');
+    $('rev-today').textContent  = fmt(s.revenue.today);
+    $('rev-month').textContent  = fmt(s.revenue.this_month);
+    $('pppoe-count').textContent= s.subscribers.pppoe_active;
+    $('voucher-count').textContent=s.subscribers.hotspot_vouchers;
+    $('r-total').textContent   = fmt(s.revenue.total);
+    $('r-paid').textContent    = s.payments.paid;
+    $('r-pending').textContent = s.payments.pending;
+    $('r-failed').textContent  = s.payments.failed;
+  }catch(e){toast('Summary error: '+e.message,'err')}
+
+  try{
+    const p=await api('/payments/?limit=8');
+    $('recent-payments').innerHTML=p.length?`
+      <table style="width:100%;border-collapse:collapse">
+      ${p.map(x=>`<tr>
+        <td style="padding:6px 0;color:var(--muted)">${x.phone}</td>
+        <td>${x.plan}</td>
+        <td>KSH ${fmt(x.amount)}</td>
+        <td>${badge(x.status,{paid:['green','Paid'],pending:['yellow','Pending'],failed:['red','Failed'],_:['gray',x.status]})}</td>
+      </tr>`).join('')}</table>`:'<p style="color:var(--muted)">No payments yet</p>';
+  }catch(e){}
+
+  try{
+    const plans=await api('/reports/plans');
+    $('plan-breakdown').innerHTML=plans.length?plans.map(p=>`
+      <div style="display:flex;justify-content:space-between;padding:8px 0;
+        border-bottom:1px solid var(--border)">
+        <span>${p.plan}</span>
+        <span style="color:var(--green)">KSH ${fmt(p.revenue)}</span>
+        <span style="color:var(--muted)">${p.count}×</span>
+      </div>`).join(''):'<p style="color:var(--muted)">No data</p>';
+  }catch(e){}
+}
+
+// ── PPPoE ──────────────────────────────────────────────────
+async function loadPPPoE(){
+  try{
+    const users=await api('/pppoe/');
+    const tbody=$('pppoe-table');
+    if(!users.length){tbody.innerHTML='<tr><td colspan="6" style="color:var(--muted);padding:20px">No users</td></tr>';return}
+    tbody.innerHTML=users.map(u=>`<tr>
+      <td><strong>${u.name||'—'}</strong></td>
+      <td>${u.profile||'—'}</td>
+      <td>${badge(u.service||'pppoe',{pppoe:['blue','PPPoE'],_:['gray','?']})}</td>
+      <td>${badge(u.disabled==='true'?'disabled':'active',{active:['green','Active'],disabled:['red','Disabled'],_:['gray','?']})}</td>
+      <td>${u['last-logged-out']||'—'}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="kickPPPoE('${u.name}')">Kick</button>
+        <button class="btn btn-danger btn-sm" onclick="deletePPPoE('${u.name}')">Delete</button>
+      </td>
+    </tr>`).join('');
+  }catch(e){toast('PPPoE load error: '+e.message,'err')}
+}
+
+async function createPPPoE(){
+  const u=$('pp-user').value.trim();
+  const p=$('pp-pass').value.trim()||Math.random().toString(36).slice(2,12);
+  const plan=$('pp-plan').value;
+  const phone=$('pp-phone').value.trim();
+  if(!u){toast('Username required','err');return}
+  try{
+    await api('/pppoe/',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:u,password:p,plan,phone,comment:'manual'})});
+    toast(`✅ Created ${u} / ${p}`);
+    loadPPPoE();
+  }catch(e){toast('Error: '+e.message,'err')}
+}
+
+async function kickPPPoE(name){
+  try{const r=await api(`/pppoe/${name}/kick`,{method:'POST'});toast(r.message);}
+  catch(e){toast('Kick failed: '+e.message,'err')}
+}
+async function deletePPPoE(name){
+  if(!confirm(`Delete ${name}?`))return;
+  try{await api(`/pppoe/${name}`,{method:'DELETE'});toast(`Deleted ${name}`);loadPPPoE();}
+  catch(e){toast('Delete failed: '+e.message,'err')}
+}
+
+// ── Hotspot ────────────────────────────────────────────────
+async function loadHotspot(){
+  loadVouchers(null);
+}
+
+async function generateVouchers(){
+  const plan=$('hs-plan').value;
+  const count=parseInt($('hs-count').value)||1;
+  const phone=$('hs-phone').value.trim();
+  try{
+    const r=await api('/hotspot/voucher',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({plan,count,phone})});
+    $('voucher-result').style.display='block';
+    $('voucher-chips').innerHTML=r.vouchers.map(v=>`
+      <div class="voucher-chip">${v}<small>${plan}</small></div>`).join('');
+    toast(`✅ ${r.vouchers.length} voucher(s) created`);
+    loadVouchers(null);
+  }catch(e){toast('Error: '+e.message,'err')}
+}
+
+async function loadVouchers(used){
+  try{
+    const qs=used===null?'':('?used='+used);
+    const data=await api('/hotspot/vouchers'+qs);
+    const tbody=$('voucher-table');
+    if(!data.length){tbody.innerHTML='<tr><td colspan="5" style="color:var(--muted);padding:20px">No vouchers</td></tr>';return}
+    tbody.innerHTML=data.map(v=>`<tr>
+      <td><code>${v.code}</code></td>
+      <td>${v.plan}</td>
+      <td>${v.phone||'—'}</td>
+      <td>${v.used?badge('used',{used:['red','Used']}):badge('unused',{unused:['green','Unused']})}</td>
+      <td>${fmtDate(v.created_at)}</td>
+    </tr>`).join('');
+  }catch(e){toast('Voucher load error','err')}
+}
+
+// ── Sessions ───────────────────────────────────────────────
+async function loadSessions(){
+  try{
+    const p=await api('/sessions/pppoe');
+    $('pppoe-sess-count').textContent=p.count;
+    const tb=$('pppoe-sessions');
+    if(!p.sessions.length){tb.innerHTML='<tr><td colspan="5" style="color:var(--muted);padding:16px">No active PPPoE sessions</td></tr>';return}
+    tb.innerHTML=p.sessions.map(s=>`<tr>
+      <td>${s.name||'—'}</td>
+      <td><code>${s.address||'—'}</code></td>
+      <td>${s.uptime||'—'}</td>
+      <td>${s['limit-bytes-in']||'—'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="kickPPPoE('${s.name}')">Kick</button></td>
+    </tr>`).join('');
+  }catch(e){toast('Sessions error: '+e.message,'err')}
+
+  try{
+    const h=await api('/sessions/hotspot');
+    $('hs-sess-count').textContent=h.count;
+    const tb=$('hs-sessions');
+    if(!h.sessions.length){tb.innerHTML='<tr><td colspan="5" style="color:var(--muted);padding:16px">No active hotspot sessions</td></tr>';return}
+    tb.innerHTML=h.sessions.map(s=>`<tr>
+      <td>${s.user||'—'}</td>
+      <td><code>${s.address||'—'}</code></td>
+      <td><code>${s['mac-address']||'—'}</code></td>
+      <td>${s.uptime||'—'}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="kickHS('${s['.id']}')">Kick</button></td>
+    </tr>`).join('');
+  }catch(e){}
+}
+async function kickHS(id){
+  try{await api(`/sessions/hotspot/kick/${id}`,{method:'POST'});toast('Kicked');loadSessions();}
+  catch(e){toast('Kick failed: '+e.message,'err')}
+}
+
+// ── Payments ───────────────────────────────────────────────
+async function loadPayments(){
+  try{
+    const data=await api('/payments/');
+    const tb=$('payments-table');
+    if(!data.length){tb.innerHTML='<tr><td colspan="7" style="color:var(--muted);padding:20px">No payments yet</td></tr>';return}
+    tb.innerHTML=data.map(p=>`<tr>
+      <td>${p.phone}</td>
+      <td>${p.plan}</td>
+      <td>KSH ${fmt(p.amount)}</td>
+      <td>${badge(p.status,{paid:['green','Paid'],pending:['yellow','Pending'],failed:['red','Failed'],paid_activation_error:['yellow','Act.Error'],_:['gray',p.status]})}</td>
+      <td><code>${p.receipt||'—'}</code></td>
+      <td>${p.username||p.voucher_code||'—'}</td>
+      <td>${fmtDate(p.created_at)}</td>
+    </tr>`).join('');
+  }catch(e){toast('Payments error: '+e.message,'err')}
+}
+
+async function initiateSTK(){
+  const phone=$('stk-phone').value.trim();
+  const plan=$('stk-plan').value;
+  const username=$('stk-user').value.trim();
+  if(!phone){toast('Phone required','err');return}
+  try{
+    const r=await api('/payments/initiate',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone,plan,username})});
+    toast('📲 '+r.message);
+    loadPayments();
+  }catch(e){toast('STK error: '+e.message,'err')}
+}
+
+// ── Reports ────────────────────────────────────────────────
+async function loadReports(){
+  try{
+    const s=await api('/reports/summary');
+    $('r-total').textContent  =fmt(s.revenue.total);
+    $('r-paid').textContent   =s.payments.paid;
+    $('r-pending').textContent=s.payments.pending;
+    $('r-failed').textContent =s.payments.failed;
+  }catch(e){}
+
+  try{
+    const daily=await api('/reports/revenue/daily');
+    drawChart(daily);
+  }catch(e){}
+
+  try{
+    const plans=await api('/reports/plans');
+    $('plan-table').innerHTML=`
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr><th style="text-align:left;color:var(--muted);font-size:11px;padding:8px 0">Plan</th>
+          <th style="text-align:right;color:var(--muted);font-size:11px">Count</th>
+          <th style="text-align:right;color:var(--muted);font-size:11px">Revenue</th></tr></thead>
+        <tbody>${plans.map(p=>`<tr>
+          <td style="padding:8px 0;border-top:1px solid var(--border)">${p.plan}</td>
+          <td style="text-align:right;border-top:1px solid var(--border)">${p.count}</td>
+          <td style="text-align:right;color:var(--green);border-top:1px solid var(--border)">KSH ${fmt(p.revenue)}</td>
+        </tr>`).join('')}</tbody>
+      </table>`;
+  }catch(e){}
+}
+
+function drawChart(data){
+  const canvas=$('revenue-chart');
+  const ctx=canvas.getContext('2d');
+  canvas.width=canvas.offsetWidth; canvas.height=160;
+  const W=canvas.width, H=canvas.height;
+  const max=Math.max(...data.map(d=>d.revenue),1);
+  const bw=W/data.length;
+  ctx.clearRect(0,0,W,H);
+  data.forEach((d,i)=>{
+    const bh=(d.revenue/max)*(H-30);
+    const x=i*bw+bw*.15, w=bw*.7;
+    ctx.fillStyle=d.revenue>0?'#3b82f6':'#2d3148';
+    ctx.beginPath();
+    ctx.roundRect(x,H-bh-20,w,bh,3);
+    ctx.fill();
+  });
+  // x-axis labels (every 7th)
+  ctx.fillStyle='#64748b'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+  data.forEach((d,i)=>{
+    if(i%7===0 || i===data.length-1){
+      ctx.fillText(d.date.slice(5),i*bw+bw/2,H-2);
+    }
+  });
+}
+
+// ── Router ─────────────────────────────────────────────────
+async function loadRouter(){
+  try{
+    const d=await api('/sessions/router');
+    const r=d.resource||{};
+    $('rt-cpu').textContent   =(r['cpu-load']||'—')+'%';
+    $('rt-mem').textContent   =r['free-memory']?Math.round(r['free-memory']/1024/1024)+'MB':'—';
+    $('rt-uptime').textContent=r.uptime||'—';
+    $('rt-board').textContent =r['board-name']||'RB2011';
+    const ifaces=d.interfaces||[];
+    $('iface-table').innerHTML=ifaces.map(i=>`<tr>
+      <td><strong>${i.name}</strong></td>
+      <td>${i.type||'—'}</td>
+      <td>${badge(i.running==='true'?'yes':'no',{yes:['green','✓'],no:['red','✗']})}</td>
+      <td>${i['tx-byte']?fmt(Math.round(i['tx-byte']/1024))+'KB':'—'}</td>
+      <td>${i['rx-byte']?fmt(Math.round(i['rx-byte']/1024))+'KB':'—'}</td>
+    </tr>`).join('');
+  }catch(e){toast('Router stats error: '+e.message,'err')}
+}
+
+// ── Boot ───────────────────────────────────────────────────
+loadOverview();
+</script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: isp-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MIKROTIK_HOST
+        value: 762d07842fbf.sn.mynetname.net
+      - key: MIKROTIK_PORT
+        value: "28728"
+      - key: MIKROTIK_USER
+        value: admin
+      - key: MIKROTIK_PASSWORD
+        sync: false          # set in Render dashboard
+      - key: MPESA_CONSUMER_KEY
+        sync: false
+      - key: MPESA_CONSUMER_SECRET
+        sync: false
+      - key: MPESA_SHORTCODE
+        sync: false
+      - key: MPESA_PASSKEY
+        sync: false
+      - key: MPESA_ENV
+        value: sandbox       # change to production when live
+      - key: MPESA_CALLBACK_URL
+        sync: false          # https://your-app.onrender.com/payments/callback
+      - key: GMAIL_ADDRESS
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: WHATSAPP_SENDER
+        sync: false
+      - key: DASHBOARD_USERNAME
+        sync: false
+      - key: DASHBOARD_PASSWORD
+        sync: false
+      - key: TZ
+        value: Africa/Nairobi
+      - key: DATABASE_URL
+        value: sqlite:///./isp.db
