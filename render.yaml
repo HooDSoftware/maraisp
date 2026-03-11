@@ -22,7 +22,7 @@ services:
       - key: MPESA_PASSKEY
         sync: false
       - key: MPESA_ENV
-        value: sandbox       # change to production when live
+        value: production
       - key: MPESA_CALLBACK_URL
         sync: false          # https://your-app.onrender.com/payments/callback
       - key: GMAIL_ADDRESS
