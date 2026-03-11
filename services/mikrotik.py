@@ -14,10 +14,13 @@ from librouteros import connect
 
 log = logging.getLogger(__name__)
 
-HOST     = os.getenv("MIKROTIK_HOST", "762d07842fbf.sn.mynetname.net")
-PORT     = int(os.getenv("MIKROTIK_PORT", "28728"))
-USER     = os.getenv("MIKROTIK_USER", "admin")
-PASSWORD = os.getenv("MIKROTIK_PASSWORD", "")
+def get_config():
+    return {
+        "host": os.getenv("MIKROTIK_HOST", "762d07842fbf.sn.mynetname.net"),
+        "port": int(os.getenv("MIKROTIK_PORT", "28728")),
+        "user": os.getenv("MIKROTIK_USER", "admin"),
+        "password": os.getenv("MIKROTIK_PASSWORD", ""),
+    }
 
 
 # ── Connection ───────────────────────────────────────────────
@@ -26,12 +29,13 @@ PASSWORD = os.getenv("MIKROTIK_PASSWORD", "")
 def get_api():
     """Context manager — opens and auto-closes a RouterOS API connection."""
     api = None
+    config = get_config()
     try:
         api = connect(
-            host=HOST,
-            port=PORT,
-            username=USER,
-            password=PASSWORD,
+            host=config["host"],
+            port=config["port"],
+            username=config["user"],
+            password=config["password"],
             timeout=10,
         )
         yield api
@@ -40,7 +44,7 @@ def get_api():
         raise RuntimeError(f"MikroTik error: {e}")
     except Exception as e:
         log.error("MikroTik connection failed: %s", e)
-        raise RuntimeError(f"Cannot reach router at {HOST}:{PORT} — {e}")
+        raise RuntimeError(f"Cannot reach router at {config['host']}:{config['port']} — {e}")
     finally:
         if api:
             try:
@@ -51,14 +55,15 @@ def get_api():
 
 def test_connection() -> dict:
     """Quick connectivity check. Returns router identity."""
+    config = get_config()
     with get_api() as api:
         identity = list(api(cmd="/system/identity/print"))
         cloud    = list(api(cmd="/ip/cloud/print"))
         return {
             "identity": identity[0].get("name") if identity else "unknown",
-            "host": HOST,
-            "port": PORT,
-            "cloud_dns": cloud[0].get("dns-name") if cloud else HOST,
+            "host": config["host"],
+            "port": config["port"],
+            "cloud_dns": cloud[0].get("dns-name") if cloud else config["host"],
         }
 
 
